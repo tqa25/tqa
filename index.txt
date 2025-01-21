@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giới thiệu bản thân</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 40px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chào mừng đến với trang web của tôi!</h1>
+    <p>Đây là trang web giới thiệu bản thân của tôi. Tôi là một người...</p>
+    <p>Bạn có thể liên hệ với tôi qua email: yourmail@email.com</p>
+</body>
+</html>
