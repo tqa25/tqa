@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# Sử dụng title từ trang cụ thể, nếu không có thì dùng title site #}
+    <title>{{ title or site.title }}</title>
+    <meta name="description" content="{{ description or site.description }}">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">{{ site.title }}</a></h1>
+        <p>{{ site.description }}</p>
+        <hr>
+    </header>
+
+    <main>
+        {# Nội dung chính của trang sẽ được chèn vào đây #}
+        {{ content | safe }}
+    </main>
+
+    <footer>
+        <hr>
+        <p>© {% year %} {{ site.title }}. Được tạo bằng Eleventy.</p>
+    </footer>
+</body>
+</html>
