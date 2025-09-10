@@ -1,109 +1,132 @@
-!DOCTYPE html
-
-html lang=vi
-
-head
-  meta charset=UTF-8
-  meta name=viewport content=width=device-width, initial-scale=1.0
-  titleLịch Tập Gym Tuầntitle
-  link href=httpscdn.jsdelivr.netnpmtailwindcss@2.2.19disttailwind.min.css rel=stylesheet
-  style
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera Giao Thông HCMC – Auto Refresh</title>
+  <style>
     body {
-      background-color #1f2937;
-      color #f9fafb;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      margin: 0;
+      padding: 1rem;
+      text-align: center;
+      background: #363636;
+      color: #fff;
+    }
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 1rem;
+      justify-content: center;
     }
     .card {
-      background-color #374151;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      width: 320px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .card-title {
-      color #facc15;
+    .card h3 {
+      margin: 0;
+      padding: 0.5rem;
+      background: #f9f9f9;
+      border-bottom: 1px solid #ddd;
+      font-size: 1rem;
     }
-    .badge {
-      background-color #111827;
-      color #f9fafb;
-      padding 0.25rem 0.5rem;
-      border-radius 0.375rem;
-      font-size 0.875rem;
+    .card img {
+      display: block;
+      width: 100%;
+      height: auto;
     }
-  style
-head
+  </style>
+</head>
+<body>
+  <h1>Camera Giao Thông HCMC – Auto Refresh mỗi 10s</h1>
+  <div class="container" id="cameraContainer"></div>
+  <script>
+    // Base URL to fetch camera snapshots.  The parameter 't' is set
+    // using the current timestamp to bypass caching and force a refresh.
+    const BASE = "https://giaothong.hochiminhcity.gov.vn:8087/Render/Camerahandler.ashx";
 
-body class=font-sans
-  div class=container mx-auto py-10 px-4
-    h1 class=text-3xl font-bold mb-8 text-centerLịch Tập Gym Tuầnh1
-    div class=grid mdgrid-cols-2 lggrid-cols-3 gap-6
+    // Array of cameras to display.  Each object should contain the
+    // human-readable name of the camera and its unique identifier (id).
+    // You can add more cameras by appending to this array.
+    const CAMERAS = [
+      {
+        name: "Ung Văn Khiêm - Nguyễn Gia Trí",
+        id: "586e29959f9ba700111b0b5"
+      }
+      // Add more cameras like this:
+      // { name: "Some Location", id: "<cameraId>" },
+    ];
 
+    /**
+     * Construct the snapshot URL for a given camera id and dimensions.
+     * A timestamp is appended to the querystring to prevent caching.
+     *
+     * @param {string} id    - The unique camera identifier
+     * @param {number} w     - Width of the image to request
+     * @param {number} h     - Height of the image to request
+     * @returns {string}     - Fully qualified URL for the snapshot
+     */
+    function buildUrl(id, w = 320, h = 180) {
+      const u = new URL(BASE);
+      u.searchParams.set("id", id);
+      u.searchParams.set("bg", "black");
+      u.searchParams.set("w", w);
+      u.searchParams.set("h", h);
+      u.searchParams.set("t", Date.now());
+      return u.toString();
+    }
 
-  !-- Thứ 2 --
-  div class=card p-6 rounded-lg shadow-md
-    h2 class=text-xl font-bold mb-2 card-titleThứ 2 – Tập chânh2
-    ul class=list-disc list-inside space-y-1
-      liLeg Press – 4 set x 10–12 repsli
-      liSquat với tạ hoặc không – 4 set x 10–12 repsli
-      liLunges – 3 set x 10 reps mỗi chânli
-      liLeg Curl – 3 set x 12 repsli
-      liCalf Raises – 3 set x 20 repsli
-    ul
-  div
+    /**
+     * Populate the page with camera cards.  Each card displays the
+     * camera name and an image element for the snapshot.  The image
+     * sources are set using buildUrl to ensure a fresh request.
+     */
+    function init() {
+      const container = document.getElementById('cameraContainer');
+      CAMERAS.forEach((cam, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const title = document.createElement('h3');
+        title.textContent = cam.name;
+        card.appendChild(title);
+        const img = document.createElement('img');
+        img.id = 'cam_' + index;
+        img.src = buildUrl(cam.id);
+        card.appendChild(img);
+        container.appendChild(card);
+      });
+    }
 
-  !-- Thứ 3 --
-  div class=card p-6 rounded-lg shadow-md
-    h2 class=text-xl font-bold mb-2 card-titleThứ 3 – Ngực và bụngh2
-    ul class=list-disc list-inside space-y-1
-      liChest Press – 4 set x 10 repsli
-      liIncline Dumbbell Press – 3 set x 10 repsli
-      liChest Fly – 3 set x 12 repsli
-      liCrunches – 3 set x 20 repsli
-      liLeg Raises – 3 set x 15 repsli
-    ul
-  div
+    /**
+     * Refresh the image sources for all cameras on the page.  This
+     * function iterates through the cameras array and updates the
+     * src attribute with a newly built URL, causing the browser to
+     * request a fresh snapshot.
+     */
+    function refreshImages() {
+      CAMERAS.forEach((cam, index) => {
+        const img = document.getElementById('cam_' + index);
+        if (img) {
+          img.src = buildUrl(cam.id);
+        }
+      });
+    }
 
-  !-- Thứ 4 --
-  div class=card p-6 rounded-lg shadow-md
-    h2 class=text-xl font-bold mb-2 card-titleThứ 4 – Cardio nhẹ + Tập môngh2
-    ul class=list-disc list-inside space-y-1
-      liĐi bộ nhanh  chạy bộ – 20 phútli
-      liGlute Kickbacks – 3 set x 15 repsli
-      liHip Thrust – 4 set x 12 repsli
-      liClamshell – 3 set x 15 repsli
-    ul
-  div
-
-  !-- Thứ 5 --
-  div class=card p-6 rounded-lg shadow-md
-    h2 class=text-xl font-bold mb-2 card-titleThứ 5 – Tập tay và vaih2
-    ul class=list-disc list-inside space-y-1
-      liBicep Curl – 3 set x 12 repsli
-      liTricep Pushdown – 3 set x 12 repsli
-      liShoulder Press – 3 set x 10 repsli
-      liLateral Raise – 3 set x 12 repsli
-    ul
-  div
-
-  !-- Thứ 6 --
-  div class=card p-6 rounded-lg shadow-md
-    h2 class=text-xl font-bold mb-2 card-titleThứ 6 – Cardio + Bụngh2
-    ul class=list-disc list-inside space-y-1
-      liNhảy dây – 10 phútli
-      liMountain Climbers – 3 set x 30 giâyli
-      liPlank – 3 lần x 1 phútli
-      liRussian Twists – 3 set x 20 repsli
-    ul
-  div
-
-  !-- Thứ 7 hoặc Chủ nhật --
-  div class=card p-6 rounded-lg shadow-md
-    h2 class=text-xl font-bold mb-2 card-titleThứ 7 hoặc CN – Nghỉ  giãn cơ nhẹh2
-    ul class=list-disc list-inside space-y-1
-      liĐi bộ nhẹ nhàng 20–30 phútli
-      liYoga cơ bản hoặc giãn cơ – 20 phútli
-    ul
-  div
-
-div
-
-
-  div
-body
-
-html
+    // Initialize camera cards on page load
+    init();
+    // Schedule image refresh every 10 seconds
+    setInterval(refreshImages, 10000);
+  </script>
+</body>
+</html>
