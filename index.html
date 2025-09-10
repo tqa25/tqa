@@ -1,132 +1,185 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Camera Giao Thông HCMC – Auto Refresh</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HCMC Traffic – Video HLS / Ảnh auto-refresh</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      margin: 0;
-      padding: 0;
-    }
-    h1 {
-      margin: 0;
-      padding: 1rem;
-      text-align: center;
-      background: #363636;
-      color: #fff;
-    }
-    .container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      padding: 1rem;
-      justify-content: center;
-    }
-    .card {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      width: 320px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .card h3 {
-      margin: 0;
-      padding: 0.5rem;
-      background: #f9f9f9;
-      border-bottom: 1px solid #ddd;
-      font-size: 1rem;
-    }
-    .card img {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
+    :root { --gap: 12px; }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#0b0f14; color:#e6edf3; }
+    header { position:sticky; top:0; background:#0b0f14cc; backdrop-filter:blur(6px); padding:12px 16px; border-bottom:1px solid #1f2937; display:flex; gap:10px; align-items:center; }
+    h1 { font-size:18px; margin:0; font-weight:600; }
+    .controls { margin-left:auto; display:flex; gap:8px; align-items:center; }
+    button { background:#111827; color:#e6edf3; border:1px solid #253041; border-radius:10px; padding:8px 10px; cursor:pointer; }
+    button:hover { background:#172033; }
+    main { padding:16px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap: var(--gap); }
+    .card { background:#0f172a; border:1px solid #1f2937; border-radius:14px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+    .card header { position:static; background:transparent; padding:10px 12px; border:0; }
+    .meta { font-size:12px; color:#9fb3c8; }
+    .box { position:relative; aspect-ratio: 300 / 230; background:#0b1220; }
+    .box img, .box video { width:100%; height:100%; object-fit:cover; display:block; }
+    .footer { padding:8px 12px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #1f2937; }
+    .status { font-size:12px; color:#9fb3c8; }
+    .small { font-size:12px; opacity:.85; }
   </style>
+  <!-- HLS.js cho trình duyệt không phát trực tiếp .m3u8 -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
-  <h1>Camera Giao Thông HCMC – Auto Refresh mỗi 10s</h1>
-  <div class="container" id="cameraContainer"></div>
-  <script>
-    // Base URL to fetch camera snapshots.  The parameter 't' is set
-    // using the current timestamp to bypass caching and force a refresh.
-    const BASE = "https://giaothong.hochiminhcity.gov.vn:8087/Render/Camerahandler.ashx";
+<header>
+  <h1>HCMC Traffic – ưu tiên video HLS, fallback ảnh</h1>
+  <div class="controls">
+    <span class="small">Chu kỳ: <strong id="intervalLabel">10s</strong></span>
+  </div>
+</header>
 
-    // Array of cameras to display.  Each object should contain the
-    // human-readable name of the camera and its unique identifier (id).
-    // You can add more cameras by appending to this array.
-    const CAMERAS = [
-      {
-        name: "Ung Văn Khiêm - Nguyễn Gia Trí",
-        id: "586e29959f9ba700111b0b5"
-      }
-      // Add more cameras like this:
-      // { name: "Some Location", id: "<cameraId>" },
-    ];
+<main>
+  <p class="small">
+    Ghi chú: Nếu camera có <code>videoUrl</code> (m3u8) thì phát video; nếu không, dùng ảnh tĩnh từ
+    <code>CameraHandler.ashx?id=...&amp;t=timestamp</code>. Bạn chỉ cần điền <code>id</code> hoặc <code>videoUrl</code>.
+  </p>
+  <div class="grid" id="grid"></div>
+</main>
 
-    /**
-     * Construct the snapshot URL for a given camera id and dimensions.
-     * A timestamp is appended to the querystring to prevent caching.
-     *
-     * @param {string} id    - The unique camera identifier
-     * @param {number} w     - Width of the image to request
-     * @param {number} h     - Height of the image to request
-     * @returns {string}     - Fully qualified URL for the snapshot
-     */
-    function buildUrl(id, w = 320, h = 180) {
-      const u = new URL(BASE);
-      u.searchParams.set("id", id);
-      u.searchParams.set("bg", "black");
-      u.searchParams.set("w", w);
-      u.searchParams.set("h", h);
-      u.searchParams.set("t", Date.now());
-      return u.toString();
-    }
+<script>
+  // Endpoint ảnh snapshot đúng theo trang nguồn (cổng 8007)
+  const SNAPSHOT_BASE = "https://giaothong.hochiminhcity.gov.vn:8007/Render/CameraHandler.ashx";
 
-    /**
-     * Populate the page with camera cards.  Each card displays the
-     * camera name and an image element for the snapshot.  The image
-     * sources are set using buildUrl to ensure a fresh request.
-     */
-    function init() {
-      const container = document.getElementById('cameraContainer');
-      CAMERAS.forEach((cam, index) => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        const title = document.createElement('h3');
-        title.textContent = cam.name;
-        card.appendChild(title);
+  // Chu kỳ làm mới (ms)
+  const REFRESH_MS = 10_000;
+  document.getElementById('intervalLabel').textContent = (REFRESH_MS/1000) + 's';
+
+  // Danh sách camera: mỗi mục có thể có id, videoUrl hoặc cả hai
+  const CAMERAS = [
+    {
+      name: "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
+      id: "586e2995f9fab7001111b0b5"
+      // videoUrl: "https://d2zihajmogu5jn.cloudfront.net/bipbop-advanced/bipbop_16x9_variant.m3u8" // demo, thay bằng stream thật khi có
+    },
+    // Thêm camera khác tại đây...
+  ];
+
+  function buildSnapshotUrl(id, w=300, h=230){
+    const u = new URL(SNAPSHOT_BASE);
+    u.searchParams.set("id", id);
+    u.searchParams.set("bg", "black");
+    u.searchParams.set("w", w);
+    u.searchParams.set("h", h);
+    u.searchParams.set("t", Date.now());
+    return u.toString();
+  }
+
+  function render(){
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    CAMERAS.forEach((cam, idx) => {
+      const card = document.createElement('article');
+      card.className = 'card';
+
+      const head = document.createElement('header');
+      head.innerHTML = `<div><div>${cam.name || ('Camera #' + (idx+1))}</div>
+                        <div class="meta">${cam.videoUrl ? 'HLS video' : cam.id ? 'Ảnh snapshot' : 'Chưa cấu hình'}</div></div>`;
+
+      const box = document.createElement('div');
+      box.className = 'box';
+
+      const foot = document.createElement('div');
+      foot.className = 'footer';
+      const status = document.createElement('span');
+      status.className = 'status';
+      status.textContent = 'Đang tải…';
+
+      if (cam.videoUrl) {
+        const video = document.createElement('video');
+        video.setAttribute('controls', '');
+        video.setAttribute('playsinline', '');
+        video.setAttribute('muted', '');
+        box.appendChild(video);
+
+        const startVideo = () => {
+          if (Hls.isSupported()) {
+            const hls = new Hls({ maxBufferLength: 10 });
+            hls.loadSource(cam.videoUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+              video.play().catch(()=>{});
+              status.textContent = 'Video: ' + new Date().toLocaleTimeString();
+            });
+            hls.on(Hls.Events.ERROR, (_, data) => {
+              status.textContent = '⚠️ Lỗi HLS: ' + (data?.details || data?.type || '');
+            });
+          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = cam.videoUrl;
+            video.addEventListener('loadedmetadata', () => {
+              video.play().catch(()=>{});
+              status.textContent = 'Video (native): ' + new Date().toLocaleTimeString();
+            });
+          } else {
+            status.textContent = '⚠️ Trình duyệt không hỗ trợ HLS';
+          }
+        };
+        startVideo();
+
+        const btn = document.createElement('button');
+        btn.textContent = cam.id ? 'Xem ảnh (fallback)' : 'Tải lại';
+        btn.addEventListener('click', () => {
+          if (cam.id) {
+            box.innerHTML = '';
+            const img = document.createElement('img');
+            img.alt = cam.name || `Camera ${idx+1}`;
+            img.loading = 'lazy';
+            img.referrerPolicy = 'no-referrer';
+            img.addEventListener('load', () => status.textContent = 'Ảnh: ' + new Date().toLocaleTimeString());
+            img.src = buildSnapshotUrl(cam.id);
+            box.appendChild(img);
+          } else {
+            video.src = '';
+            setTimeout(() => {
+              video.src = cam.videoUrl;
+              video.play().catch(()=>{});
+            }, 50);
+          }
+        });
+        foot.append(status, btn);
+
+      } else if (cam.id) {
         const img = document.createElement('img');
-        img.id = 'cam_' + index;
-        img.src = buildUrl(cam.id);
-        card.appendChild(img);
-        container.appendChild(card);
-      });
-    }
+        img.alt = cam.name || `Camera ${idx+1}`;
+        img.loading = 'lazy';
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener('load', () => status.textContent = 'Ảnh: ' + new Date().toLocaleTimeString());
+        img.onerror = () => status.textContent = '⚠️ Không tải được ảnh';
+        img.src = buildSnapshotUrl(cam.id);
+        box.appendChild(img);
 
-    /**
-     * Refresh the image sources for all cameras on the page.  This
-     * function iterates through the cameras array and updates the
-     * src attribute with a newly built URL, causing the browser to
-     * request a fresh snapshot.
-     */
-    function refreshImages() {
-      CAMERAS.forEach((cam, index) => {
-        const img = document.getElementById('cam_' + index);
-        if (img) {
-          img.src = buildUrl(cam.id);
-        }
-      });
-    }
+        const btn = document.createElement('button');
+        btn.textContent = 'Tải lại';
+        btn.addEventListener('click', () => {
+          img.src = buildSnapshotUrl(cam.id);
+          status.textContent = 'Đang tải…';
+        });
+        foot.append(status, btn);
 
-    // Initialize camera cards on page load
-    init();
-    // Schedule image refresh every 10 seconds
-    setInterval(refreshImages, 10000);
-  </script>
+      } else {
+        box.innerHTML = '<div style="padding:10px" class="small">Chưa có id hoặc videoUrl</div>';
+        foot.append(status);
+      }
+
+      card.append(head, box, foot);
+      grid.appendChild(card);
+    });
+  }
+
+  // Auto-refresh ảnh mỗi REFRESH_MS (không ảnh hưởng video)
+  setInterval(() => {
+    document.querySelectorAll('.box img').forEach(img => {
+      const base = img.src.split('?')[0];
+      img.src = base + '?t=' + Date.now();
+    });
+  }, REFRESH_MS);
+
+  render();
+</script>
 </body>
 </html>
